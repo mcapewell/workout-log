@@ -6,6 +6,7 @@ export function Home() {
   const config = useApp((s) => s.config);
   const program = useApp((s) => s.program);
   const currentLift = useApp((s) => s.currentLift)();
+  const accessoryGroup = useApp((s) => s.currentAccessoryGroup)();
   const template = getWeekTemplate(program.week);
 
   return (
@@ -38,7 +39,9 @@ export function Home() {
         )}
         <div className="flex justify-between">
           <span className="text-slate-400">Accessories</span>
-          <span className="font-semibold">{config.accessories.length} exercises</span>
+          <span className="font-semibold">
+            {accessoryGroup.name} · {accessoryGroup.exercises.length} exercises
+          </span>
         </div>
       </div>
 

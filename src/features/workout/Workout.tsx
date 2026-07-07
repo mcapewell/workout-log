@@ -17,6 +17,7 @@ export function Workout() {
   const config = useApp((s) => s.config);
   const program = useApp((s) => s.program);
   const lift = useApp((s) => s.currentLift)();
+  const accessoryGroup = useApp((s) => s.currentAccessoryGroup)();
   const finishWorkout = useApp((s) => s.finishWorkout);
 
   const template = getWeekTemplate(program.week);
@@ -42,7 +43,7 @@ export function Workout() {
     barSets.map((s) => ({ reps: String(s.targetReps), done: false })),
   );
   const [accReps, setAccReps] = useState<Record<string, string[]>>(() =>
-    Object.fromEntries(config.accessories.map((a) => [a.id, Array(a.sets).fill('')])),
+    Object.fromEntries(accessoryGroup.exercises.map((a) => [a.id, Array(a.sets).fill('')])),
   );
   const [rest, setRest] = useState<number | null>(null);
 
@@ -78,7 +79,7 @@ export function Workout() {
       totalVolumeKg += reps * s.targetWeight;
     });
 
-    const accessories: AccessoryLog[] = config.accessories.map((ex) => {
+    const accessories: AccessoryLog[] = accessoryGroup.exercises.map((ex) => {
       const reps = (accReps[ex.id] ?? []).map((r) => Number(r) || 0).filter((r) => r > 0);
       reps.forEach((r) => {
         totalReps += r;
@@ -150,8 +151,10 @@ export function Workout() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Accessories</h2>
-        {config.accessories.map((ex) => (
+        <h2 className="text-lg font-semibold">
+          Accessories · <span className="text-accent">{accessoryGroup.name}</span>
+        </h2>
+        {accessoryGroup.exercises.map((ex) => (
           <div key={ex.id} className="rounded-xl bg-surface p-3">
             <div className="flex justify-between items-baseline">
               <div className="font-semibold">{ex.name}</div>

@@ -47,6 +47,14 @@ export interface BBBConfig {
   useOppositeLift: boolean;
 }
 
+/** A named set of accessory exercises (e.g. "Arms" / "Back & Shoulders") that
+ * the user alternates between on successive workouts. */
+export interface AccessoryGroup {
+  id: string;
+  name: string;
+  exercises: AccessoryExercise[];
+}
+
 export interface AccessoryExercise {
   id: string;
   name: string;

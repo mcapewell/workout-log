@@ -32,8 +32,11 @@ export function History() {
             <span>{s.totalReps} reps</span>
             <span>{Math.round(s.totalVolumeKg)}kg volume</span>
           </div>
-          {s.accessories.length > 0 && (
+          {s.accessories.some((a) => a.reps.length > 0) && (
             <div className="mt-1 text-xs text-slate-400">
+              {s.accessoryGroupName && (
+                <span className="text-slate-300 font-medium">{s.accessoryGroupName}: </span>
+              )}
               {s.accessories
                 .filter((a) => a.reps.length > 0)
                 .map((a) => `${a.name} ${a.reps.join('/')}`)

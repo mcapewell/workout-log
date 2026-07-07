@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { useApp } from '../../store/appStore';
 import { canVibrate } from '../../platform/notifier';
 import { health } from '../../platform/health';
+import type { AccessoryExercise } from '../../domain/types';
 
 export function Settings() {
   const { config, program, history, setupComplete } = useApp();
@@ -17,6 +18,26 @@ export function Settings() {
 
   const setRest = (key: 'main' | 'bbb' | 'accessory', v: number) =>
     updateConfig({ rest: { ...config.rest, [key]: v } });
+
+  const patchGroup = (groupId: string, patch: { name: string }) =>
+    updateConfig({
+      accessoryGroups: config.accessoryGroups.map((g) =>
+        g.id === groupId ? { ...g, ...patch } : g,
+      ),
+    });
+
+  const patchExercise = (
+    groupId: string,
+    exId: string,
+    patch: Partial<AccessoryExercise>,
+  ) =>
+    updateConfig({
+      accessoryGroups: config.accessoryGroups.map((g) =>
+        g.id === groupId
+          ? { ...g, exercises: g.exercises.map((e) => (e.id === exId ? { ...e, ...patch } : e)) }
+          : g,
+      ),
+    });
 
   const exportBackup = () => {
     const blob = new Blob(
@@ -101,37 +122,35 @@ export function Settings() {
         </div>
       </section>
 
-      <section className="space-y-2">
-        <h2 className="font-semibold text-slate-300">Accessories</h2>
-        {config.accessories.map((ex) => (
-          <div key={ex.id} className="rounded-lg bg-surface p-3 space-y-2">
+      <section className="space-y-4">
+        <h2 className="font-semibold text-slate-300">Accessory workouts (alternated A/B)</h2>
+        {config.accessoryGroups.map((group) => (
+          <div key={group.id} className="space-y-2">
             <input
-              value={ex.name}
-              onChange={(e) =>
-                updateConfig({
-                  accessories: config.accessories.map((a) =>
-                    a.id === ex.id ? { ...a, name: e.target.value } : a,
-                  ),
-                })
-              }
-              className="w-full rounded bg-base px-2 py-1 font-semibold"
+              value={group.name}
+              onChange={(e) => patchGroup(group.id, { name: e.target.value })}
+              className="w-full rounded bg-base px-2 py-2 font-semibold text-accent"
+              aria-label="accessory workout name"
             />
-            <div className="grid grid-cols-4 gap-2">
-              {(['sets', 'repMin', 'repMax', 'weight'] as const).map((k) => (
-                <LabeledNum
-                  key={k}
-                  label={k}
-                  value={ex[k]}
-                  onChange={(v) =>
-                    updateConfig({
-                      accessories: config.accessories.map((a) =>
-                        a.id === ex.id ? { ...a, [k]: v } : a,
-                      ),
-                    })
-                  }
+            {group.exercises.map((ex) => (
+              <div key={ex.id} className="rounded-lg bg-surface p-3 space-y-2">
+                <input
+                  value={ex.name}
+                  onChange={(e) => patchExercise(group.id, ex.id, { name: e.target.value })}
+                  className="w-full rounded bg-base px-2 py-1 font-semibold"
                 />
-              ))}
-            </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {(['sets', 'repMin', 'repMax', 'weight'] as const).map((k) => (
+                    <LabeledNum
+                      key={k}
+                      label={k}
+                      value={ex[k]}
+                      onChange={(v) => patchExercise(group.id, ex.id, { [k]: v })}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         ))}
       </section>
