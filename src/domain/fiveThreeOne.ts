@@ -61,6 +61,10 @@ export const WARMUP_SETS = [
   { percent: 60, reps: 3 },
 ];
 
+/** Round a weight to the nearest 0.5 kg. Used for Training Maxes (a virtual
+ * reference number), which need to be tidy but not physically bar-loadable. */
+export const roundToHalf = (kg: number): number => Math.round(kg * 2) / 2;
+
 export function getWeekTemplate(week: number): WeekTemplate {
   const t = WEEK_TEMPLATES.find((w) => w.week === week);
   if (!t) throw new Error(`Invalid 5/3/1 week: ${week}`);

@@ -1,6 +1,5 @@
-import { nearestLoadable } from './plates';
-import { getWeekTemplate } from './fiveThreeOne';
-import type { AccessoryExercise, MainLift, PlateInventory } from './types';
+import { getWeekTemplate, roundToHalf } from './fiveThreeOne';
+import type { AccessoryExercise, MainLift } from './types';
 
 // ---- Main lift (5/3/1) progression ------------------------------------------
 
@@ -31,28 +30,27 @@ export function hitAmrapMinimum(week: number, amrapReps: number): boolean {
  * Decide the next Training Max at the end of a cycle.
  *
  * @param cycleAmrapReps AMRAP reps recorded on weeks 1,2,3 (deload has no AMRAP).
- *   Any missed minimum triggers a Wendler reset (TM -> 90%, snapped to loadable).
- *   Otherwise the TM increases by the lift's configured increment.
+ *   Any missed minimum triggers a Wendler reset (TM -> 90%). Otherwise the TM
+ *   increases by the lift's configured increment. TMs are rounded to 0.5 kg;
+ *   the actual working weights are snapped to loadable when the sets are built.
  */
 export function evaluateCycle(
   lift: MainLift,
   cycleAmrapReps: { week: number; reps: number }[],
-  inv: PlateInventory,
 ): MainProgressionResult {
   const missed = cycleAmrapReps.find((r) => !hitAmrapMinimum(r.week, r.reps));
 
   if (missed) {
-    const newTrainingMax = nearestLoadable(lift.trainingMax * 0.9, inv);
     return {
       action: 'reset',
-      newTrainingMax,
+      newTrainingMax: roundToHalf(lift.trainingMax * 0.9),
       reason: `Missed the ${amrapBaseReps(missed.week)}-rep minimum in week ${missed.week}; resetting Training Max to 90%.`,
     };
   }
 
   return {
     action: 'increase',
-    newTrainingMax: nearestLoadable(lift.trainingMax + lift.increment, inv),
+    newTrainingMax: roundToHalf(lift.trainingMax + lift.increment),
     reason: `Hit all AMRAP minimums; +${lift.increment}kg to Training Max.`,
   };
 }

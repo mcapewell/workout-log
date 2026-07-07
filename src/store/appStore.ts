@@ -83,10 +83,10 @@ interface AppState {
 }
 
 const DEFAULT_LIFTS: MainLift[] = [
-  { id: 'ohp', name: 'Overhead Press', category: 'upper', trainingMax: 40, increment: 2.5 },
-  { id: 'deadlift', name: 'Deadlift', category: 'lower', trainingMax: 100, increment: 5 },
-  { id: 'bench', name: 'Bench Press', category: 'upper', trainingMax: 60, increment: 2.5 },
-  { id: 'squat', name: 'Squat', category: 'lower', trainingMax: 80, increment: 5 },
+  { id: 'ohp', name: 'Overhead Press', category: 'upper', trainingMax: 62, increment: 2.5 },
+  { id: 'deadlift', name: 'Deadlift', category: 'lower', trainingMax: 140, increment: 5 },
+  { id: 'bench', name: 'Bench Press', category: 'upper', trainingMax: 83, increment: 2.5 },
+  { id: 'squat', name: 'Squat', category: 'lower', trainingMax: 132, increment: 5 },
 ];
 
 const DEFAULT_ACCESSORIES: AccessoryExercise[] = [
@@ -184,7 +184,7 @@ export const useApp = create<AppState>()(
             // Cycle complete: progress or reset each lift's Training Max.
             mainLifts = config.mainLifts.map((l) => {
               const reps = liftCycleAmrap[l.id] ?? [];
-              const result = evaluateCycle(l, reps, config.inventory);
+              const result = evaluateCycle(l, reps);
               return { ...l, trainingMax: result.newTrainingMax };
             });
             week = 1;

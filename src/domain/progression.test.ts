@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { evaluateCycle, progressAccessory, hitAmrapMinimum } from './progression';
-import { DEFAULT_INVENTORY } from './plates';
 import type { AccessoryExercise, MainLift } from './types';
 
 const bench: MainLift = {
@@ -13,32 +12,24 @@ const bench: MainLift = {
 
 describe('5/3/1 cycle progression', () => {
   it('increases the Training Max when all AMRAP minimums are met', () => {
-    const r = evaluateCycle(
-      bench,
-      [
-        { week: 1, reps: 8 },
-        { week: 2, reps: 5 },
-        { week: 3, reps: 3 },
-      ],
-      DEFAULT_INVENTORY,
-    );
+    const r = evaluateCycle(bench, [
+      { week: 1, reps: 8 },
+      { week: 2, reps: 5 },
+      { week: 3, reps: 3 },
+    ]);
     expect(r.action).toBe('increase');
     expect(r.newTrainingMax).toBe(82.5);
   });
 
   it('resets to ~90% when a minimum is missed', () => {
-    const r = evaluateCycle(
-      bench,
-      [
-        { week: 1, reps: 5 },
-        { week: 2, reps: 3 },
-        { week: 3, reps: 0 }, // failed the 1+ set
-      ],
-      DEFAULT_INVENTORY,
-    );
+    const r = evaluateCycle(bench, [
+      { week: 1, reps: 5 },
+      { week: 2, reps: 3 },
+      { week: 3, reps: 0 }, // failed the 1+ set
+    ]);
     expect(r.action).toBe('reset');
-    // 80 * 0.9 = 72, which isn't exactly loadable with this plate set -> snaps to 72.5
-    expect(r.newTrainingMax).toBe(72.5);
+    // 80 * 0.9 = 72 (TM is rounded to 0.5, not snapped to loadable)
+    expect(r.newTrainingMax).toBe(72);
   });
 
   it('knows week-by-week AMRAP minimums', () => {

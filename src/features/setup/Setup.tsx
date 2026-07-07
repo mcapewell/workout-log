@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useApp, DEFAULT_CONFIG } from '../../store/appStore';
-import { nearestLoadable } from '../../domain/plates';
+import { roundToHalf } from '../../domain/fiveThreeOne';
 
 export function Setup() {
   const completeSetup = useApp((s) => s.completeSetup);
@@ -14,7 +14,7 @@ export function Setup() {
       const entered = values[l.id] || l.trainingMax;
       // If the user entered a true 1RM, the Training Max is 90% of it.
       const tm = asOneRM ? entered * 0.9 : entered;
-      return { ...l, trainingMax: nearestLoadable(tm, DEFAULT_CONFIG.inventory) };
+      return { ...l, trainingMax: roundToHalf(tm) };
     });
     completeSetup({ ...DEFAULT_CONFIG, mainLifts });
   };
