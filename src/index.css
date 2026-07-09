@@ -17,9 +17,11 @@ body {
   background: #0f172a;
   color: #e2e8f0;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  /* Respect the iPhone safe areas when installed as a PWA. */
+  /* Respect the iPhone safe areas when installed as a PWA. The bottom inset is
+   * handled on the nav itself (App.tsx) so its background fills the home-
+   * indicator strip instead of leaving a gap beneath it. */
   padding: env(safe-area-inset-top) env(safe-area-inset-right)
-    env(safe-area-inset-bottom) env(safe-area-inset-left);
+    0 env(safe-area-inset-left);
   -webkit-user-select: none;
   user-select: none;
 }

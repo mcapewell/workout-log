@@ -17,7 +17,7 @@ const NAV = [
 
 function BottomNav() {
   return (
-    <nav className="sticky bottom-0 grid grid-cols-4 border-t border-slate-700 bg-base">
+    <nav className="sticky bottom-0 grid grid-cols-4 border-t border-slate-700 bg-base pb-[env(safe-area-inset-bottom)]">
       {NAV.map((n) => (
         <NavLink
           key={n.to}
