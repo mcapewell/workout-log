@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../../store/appStore';
 import { getWeekTemplate } from '../../domain/fiveThreeOne';
@@ -7,7 +8,22 @@ export function Home() {
   const program = useApp((s) => s.program);
   const currentLift = useApp((s) => s.currentLift)();
   const accessoryGroup = useApp((s) => s.currentAccessoryGroup)();
+  const activeWorkout = useApp((s) => s.activeWorkout);
+  const clearActiveWorkout = useApp((s) => s.clearActiveWorkout);
   const template = getWeekTemplate(program.week);
+
+  // Live-tick the elapsed time shown on the resume banner.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!activeWorkout) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [activeWorkout]);
+
+  const resumeLiftName =
+    config.mainLifts.find((l) => l.id === activeWorkout?.liftId)?.name ?? currentLift.name;
+  const elapsed = activeWorkout ? Math.max(0, Math.floor((now - activeWorkout.startedAt) / 1000)) : 0;
+  const elapsedLabel = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
 
   return (
     <div className="p-4 space-y-5">
@@ -17,6 +33,30 @@ export function Home() {
         </div>
         <h1 className="text-3xl font-bold mt-1">Today: {currentLift.name}</h1>
       </header>
+
+      {activeWorkout && (
+        <div className="rounded-xl border border-accent bg-surface p-4 space-y-3">
+          <div className="flex items-baseline justify-between">
+            <div className="font-semibold">Workout in progress</div>
+            <div className="text-accent font-semibold tabular-nums">⏱ {elapsedLabel}</div>
+          </div>
+          <div className="text-sm text-slate-400">{resumeLiftName}</div>
+          <div className="flex gap-2">
+            <Link
+              to="/workout"
+              className="flex-1 text-center rounded-lg bg-accent text-black font-semibold py-3"
+            >
+              Resume →
+            </Link>
+            <button
+              onClick={clearActiveWorkout}
+              className="rounded-lg bg-base px-4 py-3 text-sm text-slate-400"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-xl bg-surface p-4 space-y-2">
         <div className="flex justify-between">
@@ -49,7 +89,7 @@ export function Home() {
         to="/workout"
         className="block text-center rounded-xl bg-accent text-black font-bold text-xl py-5"
       >
-        Start workout →
+        {activeWorkout ? 'Resume workout →' : 'Start workout →'}
       </Link>
 
       <p className="text-xs text-slate-500 text-center">
