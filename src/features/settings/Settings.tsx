@@ -1,8 +1,55 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../store/appStore';
 import { canVibrate } from '../../platform/notifier';
 import { health } from '../../platform/health';
 import type { AccessoryExercise } from '../../domain/types';
+
+/** Temporary layout diagnostics for the iOS PWA bottom-gap investigation.
+ * Reports the viewport heights and safe-area insets iOS actually resolves so we
+ * can see why the app shell doesn't reach the physical bottom of the screen. */
+function useLayoutDiagnostics() {
+  const [info, setInfo] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const read = () => {
+      const probe = document.createElement('div');
+      probe.style.cssText =
+        'position:fixed;visibility:hidden;padding:' +
+        'env(safe-area-inset-top) env(safe-area-inset-right) ' +
+        'env(safe-area-inset-bottom) env(safe-area-inset-left)';
+      document.body.appendChild(probe);
+      const cs = getComputedStyle(probe);
+      const insets = {
+        top: cs.paddingTop,
+        right: cs.paddingRight,
+        bottom: cs.paddingBottom,
+        left: cs.paddingLeft,
+      };
+      probe.remove();
+      const standalone =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        // iOS-specific flag
+        (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+      setInfo({
+        'display-mode standalone': String(standalone),
+        'window.innerHeight': `${window.innerHeight}px`,
+        'screen.height': `${window.screen.height}px`,
+        'visualViewport.height': window.visualViewport
+          ? `${Math.round(window.visualViewport.height)}px`
+          : 'n/a',
+        'safe-area top/bottom': `${insets.top} / ${insets.bottom}`,
+        'safe-area left/right': `${insets.left} / ${insets.right}`,
+      });
+    };
+    read();
+    window.visualViewport?.addEventListener('resize', read);
+    window.addEventListener('resize', read);
+    return () => {
+      window.visualViewport?.removeEventListener('resize', read);
+      window.removeEventListener('resize', read);
+    };
+  }, []);
+  return info;
+}
 
 export function Settings() {
   const { config, program, history, setupComplete } = useApp();
@@ -10,6 +57,7 @@ export function Settings() {
   const importState = useApp((s) => s.importState);
   const resetAll = useApp((s) => s.resetAll);
   const fileRef = useRef<HTMLInputElement>(null);
+  const diagnostics = useLayoutDiagnostics();
 
   const setTM = (id: string, tm: number) =>
     updateConfig({
@@ -183,6 +231,15 @@ export function Settings() {
         <div className="font-semibold text-slate-300">Device notes</div>
         <div>Vibration on this device: {canVibrate() ? 'supported' : 'not supported (iPhone uses sound + screen flash)'}</div>
         <div>Apple Health: {health.isSupported() ? 'connected' : 'available in the future native build'}</div>
+        <div className="mt-2 border-t border-slate-700 pt-2 font-semibold text-slate-300">
+          Layout diagnostics
+        </div>
+        {Object.entries(diagnostics).map(([k, v]) => (
+          <div key={k} className="flex justify-between tabular-nums">
+            <span>{k}</span>
+            <span className="text-slate-300">{v}</span>
+          </div>
+        ))}
       </section>
 
       <button
