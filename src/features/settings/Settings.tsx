@@ -154,6 +154,31 @@ export function Settings() {
                     />
                   ))}
                 </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex flex-col text-xs text-slate-400">
+                    equipment
+                    <select
+                      value={ex.equipment ?? 'cable'}
+                      onChange={(e) =>
+                        patchExercise(group.id, ex.id, {
+                          equipment: e.target.value as AccessoryExercise['equipment'],
+                        })
+                      }
+                      className="mt-1 rounded bg-base px-2 py-1 text-slate-100 text-base"
+                    >
+                      <option value="cable">cable</option>
+                      <option value="barbell">barbell</option>
+                      <option value="dumbbell">dumbbell</option>
+                    </select>
+                  </label>
+                  {(ex.equipment ?? 'cable') !== 'cable' && (
+                    <LabeledNum
+                      label={ex.equipment === 'dumbbell' ? 'handle kg' : 'bar kg'}
+                      value={ex.barWeight ?? 0}
+                      onChange={(v) => patchExercise(group.id, ex.id, { barWeight: v })}
+                    />
+                  )}
+                </div>
               </div>
             ))}
           </div>

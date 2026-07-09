@@ -5,6 +5,7 @@ import { DEFAULT_INVENTORY } from '../domain/plates';
 import { estimate1RM } from '../domain/fiveThreeOne';
 import { evaluateCycle, progressAccessory } from '../domain/progression';
 import type {
+  AccessoryEquipment,
   AccessoryGroup,
   BBBConfig,
   MainLift,
@@ -57,6 +58,8 @@ export interface ActiveWorkout {
   rows: { reps: string; done: boolean }[];
   /** Per accessory-exercise entered reps, keyed by exercise id. */
   accReps: Record<string, string[]>;
+  /** Per accessory-set completion flag, keyed by exercise id. */
+  accDone: Record<string, boolean[]>;
   /** Absolute end time of an open rest timer, or null when none is running. */
   restEndsAt: number | null;
 }
@@ -107,6 +110,7 @@ interface AppState {
     week: number;
     rows: { reps: string; done: boolean }[];
     accReps: Record<string, string[]>;
+    accDone: Record<string, boolean[]>;
   }) => void;
   updateActiveWorkout: (partial: Partial<ActiveWorkout>) => void;
   clearActiveWorkout: () => void;
@@ -128,6 +132,8 @@ const acc = (
   weight: number,
   repMin = 10,
   repMax = 15,
+  equipment: AccessoryEquipment = 'cable',
+  barWeight = 0,
 ): AccessoryGroup['exercises'][number] => ({
   id,
   name,
@@ -137,6 +143,8 @@ const acc = (
   weight,
   increment: 2.5,
   failStreak: 0,
+  equipment,
+  barWeight,
 });
 
 // Two accessory workouts the user alternates between each session. Starting
@@ -195,7 +203,7 @@ export const useApp = create<AppState>()(
 
       completeSetup: (config) => set({ config, setupComplete: true }),
 
-      startWorkout: ({ liftId, week, rows, accReps }) =>
+      startWorkout: ({ liftId, week, rows, accReps, accDone }) =>
         set({
           activeWorkout: {
             startedAt: Date.now(),
@@ -203,6 +211,7 @@ export const useApp = create<AppState>()(
             week,
             rows,
             accReps,
+            accDone,
             restEndsAt: null,
           },
         }),
