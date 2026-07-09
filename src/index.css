@@ -6,7 +6,15 @@
   color-scheme: dark;
 }
 
-html,
+/* On an installed iOS PWA, `height: 100%` does not reach the physical bottom of
+ * the screen, so the in-flow bottom nav floats above the home-indicator area and
+ * leaves a gap. `100dvh` (with a static `vh` fallback) measures the true
+ * standalone viewport and closes it. */
+html {
+  height: 100vh;
+  height: 100dvh;
+}
+
 body,
 #root {
   height: 100%;
