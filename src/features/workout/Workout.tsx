@@ -142,16 +142,16 @@ export function Workout() {
     updateActiveWorkout({ restEndsAt: Date.now() + config.rest.accessory * 1000 });
   };
 
-  // Last logged reps per accessory exercise, taken from the most recent session
-  // that recorded any reps for it. Gives the user a target to aim for (#20).
+  // Last logged reps + weight per accessory exercise, taken from the most recent
+  // session that recorded any reps for it. Gives the user a target to aim for (#20).
   const prevAccReps = useMemo(() => {
-    const map: Record<string, number[]> = {};
+    const map: Record<string, { reps: number[]; weight: number }> = {};
     for (const ex of accessoryGroup.exercises) {
       const last = history.find((s) =>
         s.accessories.some((a) => a.id === ex.id && a.reps.length > 0),
       );
       const logged = last?.accessories.find((a) => a.id === ex.id);
-      if (logged) map[ex.id] = logged.reps;
+      if (logged) map[ex.id] = { reps: logged.reps, weight: logged.weight };
     }
     return map;
   }, [history, accessoryGroup]);
@@ -281,8 +281,10 @@ export function Workout() {
                   {ex.weight}kg · {ex.repMin}–{ex.repMax} reps
                 </div>
               </div>
-              {prev && prev.length > 0 && (
-                <div className="mt-0.5 text-xs text-slate-400">Last: {prev.join(' / ')}</div>
+              {prev && prev.reps.length > 0 && (
+                <div className="mt-0.5 text-xs text-slate-400">
+                  Last: {prev.reps.join(' / ')} @ {prev.weight}kg
+                </div>
               )}
               {loadout && (
                 <div className="mt-2">
@@ -300,7 +302,7 @@ export function Workout() {
                       <input
                         type="number"
                         inputMode="numeric"
-                        placeholder={prev?.[idx] !== undefined ? String(prev[idx]) : `S${idx + 1}`}
+                        placeholder={prev?.reps[idx] !== undefined ? String(prev.reps[idx]) : `S${idx + 1}`}
                         value={accReps[ex.id]?.[idx] ?? ''}
                         onFocus={(e) => e.currentTarget.select()}
                         onChange={(e) => setAcc(ex.id, idx, e.target.value)}
