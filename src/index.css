@@ -6,21 +6,20 @@
   color-scheme: dark;
 }
 
-/* On an installed iOS PWA, `height: 100%` does not reach the physical bottom of
- * the screen, so the in-flow bottom nav floats above the home-indicator area and
- * leaves a gap. `100dvh` (with a static `vh` fallback) measures the true
- * standalone viewport and closes it. */
 html {
   height: 100vh;
   height: 100dvh;
 }
 
-body,
-#root {
-  height: 100%;
-}
-
+/* Lock the document to the viewport so the whole page can't rubber-band scroll
+ * on an installed iOS PWA. Without this, the standalone viewport height is
+ * mismeasured at load and the in-flow bottom nav floats above the home
+ * indicator (leaving a gap) until an overscroll drag forces a reflow. Pinning
+ * the body means only <main> (overflow-y-auto) scrolls, and the nav stays put. */
 body {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
   margin: 0;
   background: #0f172a;
   color: #e2e8f0;
@@ -32,6 +31,10 @@ body {
     0 env(safe-area-inset-left);
   -webkit-user-select: none;
   user-select: none;
+}
+
+#root {
+  height: 100%;
 }
 
 /* Full-screen flash used by the rest timer when time is up. */
