@@ -96,6 +96,7 @@ export function generateMainSets(
         targetWeight: loadout.weight,
         targetReps: w.reps,
         isAmrap: false,
+        isWarmup: true,
         loadout,
       });
     }

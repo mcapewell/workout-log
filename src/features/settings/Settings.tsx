@@ -16,7 +16,7 @@ export function Settings() {
       mainLifts: config.mainLifts.map((l) => (l.id === id ? { ...l, trainingMax: tm } : l)),
     });
 
-  const setRest = (key: 'main' | 'bbb' | 'accessory', v: number) =>
+  const setRest = (key: 'warmup' | 'main' | 'bbb' | 'accessory', v: number) =>
     updateConfig({ rest: { ...config.rest, [key]: v } });
 
   const patchGroup = (groupId: string, patch: { name: string }) =>
@@ -111,7 +111,12 @@ export function Settings() {
 
       <section className="space-y-2">
         <h2 className="font-semibold text-slate-300">Rest timers (seconds)</h2>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
+          <LabeledNum
+            label="Warmup"
+            value={config.rest.warmup ?? 90}
+            onChange={(v) => setRest('warmup', v)}
+          />
           <LabeledNum label="Main" value={config.rest.main} onChange={(v) => setRest('main', v)} />
           <LabeledNum label="BBB" value={config.rest.bbb} onChange={(v) => setRest('bbb', v)} />
           <LabeledNum

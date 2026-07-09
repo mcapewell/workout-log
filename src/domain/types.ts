@@ -75,6 +75,8 @@ export interface PrescribedSet {
   targetWeight: number;
   targetReps: number;
   isAmrap: boolean;
+  /** True for 5/3/1 warm-up sets (they rest less than working sets). */
+  isWarmup?: boolean;
   loadout: Loadout;
 }
 

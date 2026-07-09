@@ -13,6 +13,7 @@ import type {
 } from '../domain/types';
 
 export interface RestDefaults {
+  warmup: number;
   main: number;
   bbb: number;
   accessory: number;
@@ -144,7 +145,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   inventory: DEFAULT_INVENTORY,
   bbb: { percentOfTM: 50, sets: 5, reps: 10, useOppositeLift: false },
   accessoryGroups: DEFAULT_ACCESSORY_GROUPS,
-  rest: { main: 180, bbb: 90, accessory: 75 },
+  rest: { warmup: 90, main: 180, bbb: 90, accessory: 60 },
   includeWarmups: true,
 };
 

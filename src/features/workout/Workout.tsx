@@ -33,7 +33,10 @@ export function Workout() {
 
   const barSets: (PrescribedSet & { rest: number })[] = useMemo(
     () => [
-      ...mainSets.map((s) => ({ ...s, rest: config.rest.main })),
+      ...mainSets.map((s) => ({
+        ...s,
+        rest: s.isWarmup ? config.rest.warmup ?? 90 : config.rest.main,
+      })),
       ...bbbSets.map((s) => ({ ...s, rest: config.rest.bbb })),
     ],
     [mainSets, bbbSets, config.rest],
@@ -164,16 +167,25 @@ export function Workout() {
             </div>
             <div className="mt-2 flex gap-2">
               {Array.from({ length: ex.sets }).map((_, idx) => (
-                <input
-                  key={idx}
-                  type="number"
-                  inputMode="numeric"
-                  placeholder={`S${idx + 1}`}
-                  value={accReps[ex.id]?.[idx] ?? ''}
-                  onChange={(e) => setAcc(ex.id, idx, e.target.value)}
-                  className="w-full rounded bg-base text-center text-lg py-2"
-                  aria-label={`${ex.name} set ${idx + 1} reps`}
-                />
+                <div key={idx} className="flex flex-1 flex-col gap-1">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    placeholder={`S${idx + 1}`}
+                    value={accReps[ex.id]?.[idx] ?? ''}
+                    onChange={(e) => setAcc(ex.id, idx, e.target.value)}
+                    className="w-full rounded bg-base text-center text-lg py-2"
+                    aria-label={`${ex.name} set ${idx + 1} reps`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setRest(config.rest.accessory)}
+                    className="rounded bg-base py-1 text-sm text-slate-400"
+                    aria-label={`rest after ${ex.name} set ${idx + 1}`}
+                  >
+                    ⏱ rest
+                  </button>
+                </div>
               ))}
             </div>
           </div>
