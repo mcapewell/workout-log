@@ -2,31 +2,39 @@ import { useEffect, useRef, useState } from 'react';
 import { playAlarm } from '../platform/notifier';
 
 interface Props {
-  seconds: number;
+  /** Absolute wall-clock end time (ms epoch). Owned by the caller so the
+   * countdown can be persisted and resumed across navigation / lock / reload. */
+  endsAt: number;
   onDone: () => void;
   onClose: () => void;
+  /** Report a new end time when the user taps −15s / +15s so the caller can
+   * persist the adjustment. */
+  onAdjust: (endsAt: number) => void;
 }
+
+const remainingSecs = (endsAt: number) =>
+  Math.max(0, Math.round((endsAt - Date.now()) / 1000));
 
 /**
  * Countdown rest timer. Uses wall-clock time (not tick counting) so it stays
- * accurate even when iOS throttles background timers. When it reaches zero it
- * fires the audible alarm + on-screen flash (the reliable iOS feedback channel).
+ * accurate even when iOS throttles background timers or the screen is locked.
+ * When it reaches zero it fires the audible alarm + on-screen flash (the
+ * reliable iOS feedback channel).
  */
-export function RestTimer({ seconds, onDone, onClose }: Props) {
-  const [remaining, setRemaining] = useState(seconds);
+export function RestTimer({ endsAt, onDone, onClose, onAdjust }: Props) {
+  const [remaining, setRemaining] = useState(() => remainingSecs(endsAt));
   const [flash, setFlash] = useState(false);
-  const endAt = useRef(Date.now() + seconds * 1000);
   const fired = useRef(false);
 
+  // A fresh or adjusted end time in the future re-arms the alarm.
   useEffect(() => {
-    endAt.current = Date.now() + seconds * 1000;
-    fired.current = false;
-    setRemaining(seconds);
-  }, [seconds]);
+    if (endsAt - Date.now() > 0) fired.current = false;
+    setRemaining(remainingSecs(endsAt));
+  }, [endsAt]);
 
   useEffect(() => {
     const tick = () => {
-      const left = Math.max(0, Math.round((endAt.current - Date.now()) / 1000));
+      const left = remainingSecs(endsAt);
       setRemaining(left);
       if (left <= 0 && !fired.current) {
         fired.current = true;
@@ -38,20 +46,16 @@ export function RestTimer({ seconds, onDone, onClose }: Props) {
     };
     const id = setInterval(tick, 250);
     return () => clearInterval(id);
-  }, [onDone]);
+  }, [endsAt, onDone]);
 
-  const adjust = (delta: number) => {
-    endAt.current += delta * 1000;
-    setRemaining(Math.max(0, Math.round((endAt.current - Date.now()) / 1000)));
-    fired.current = false;
-  };
+  const adjust = (delta: number) => onAdjust(endsAt + delta * 1000);
 
   const mm = Math.floor(remaining / 60);
   const ss = String(remaining % 60).padStart(2, '0');
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-base/95 ${
+      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-base ${
         flash ? 'timer-flash' : ''
       }`}
     >

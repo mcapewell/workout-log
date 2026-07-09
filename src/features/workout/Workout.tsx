@@ -19,6 +19,13 @@ export function Workout() {
   const lift = useApp((s) => s.currentLift)();
   const accessoryGroup = useApp((s) => s.currentAccessoryGroup)();
   const finishWorkout = useApp((s) => s.finishWorkout);
+  const startWorkout = useApp((s) => s.startWorkout);
+  const updateActiveWorkout = useApp((s) => s.updateActiveWorkout);
+  const clearActiveWorkout = useApp((s) => s.clearActiveWorkout);
+  // Persisted timers for the in-progress workout. Reading them reactively keeps
+  // the total timer and rest overlay in sync across resume / reload.
+  const startedAt = useApp((s) => s.activeWorkout?.startedAt ?? null);
+  const restEndsAt = useApp((s) => s.activeWorkout?.restEndsAt ?? null);
 
   const template = getWeekTemplate(program.week);
 
@@ -42,13 +49,48 @@ export function Workout() {
     [mainSets, bbbSets, config.rest],
   );
 
-  const [rows, setRows] = useState<BarRowState[]>(() =>
-    barSets.map((s) => ({ reps: String(s.targetReps), done: false })),
-  );
-  const [accReps, setAccReps] = useState<Record<string, string[]>>(() =>
-    Object.fromEntries(accessoryGroup.exercises.map((a) => [a.id, Array(a.sets).fill('')])),
-  );
-  const [rest, setRest] = useState<number | null>(null);
+  // Seed local state either from a resumable in-progress workout (matching this
+  // lift/week) or from fresh defaults. Runs once on mount.
+  const initial = useMemo(() => {
+    const aw = useApp.getState().activeWorkout;
+    const resumable =
+      aw &&
+      aw.liftId === lift.id &&
+      aw.week === program.week &&
+      aw.rows.length === barSets.length;
+    if (resumable) {
+      return {
+        rows: aw.rows,
+        accReps: Object.fromEntries(
+          accessoryGroup.exercises.map((a) => [a.id, aw.accReps[a.id] ?? Array(a.sets).fill('')]),
+        ),
+      };
+    }
+    return {
+      rows: barSets.map((s) => ({ reps: String(s.targetReps), done: false })),
+      accReps: Object.fromEntries(accessoryGroup.exercises.map((a) => [a.id, Array(a.sets).fill('')])),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const [rows, setRows] = useState<BarRowState[]>(initial.rows);
+  const [accReps, setAccReps] = useState<Record<string, string[]>>(initial.accReps);
+
+  // Ensure an activeWorkout exists (stamps startedAt) for a fresh session.
+  useEffect(() => {
+    const aw = useApp.getState().activeWorkout;
+    const resumable =
+      aw && aw.liftId === lift.id && aw.week === program.week && aw.rows.length === barSets.length;
+    if (!resumable) {
+      startWorkout({ liftId: lift.id, week: program.week, rows: initial.rows, accReps: initial.accReps });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist progress back to the store so it survives navigation, lock, or kill.
+  useEffect(() => {
+    updateActiveWorkout({ rows, accReps });
+  }, [rows, accReps, updateActiveWorkout]);
 
   // Keep the screen awake and audio unlocked for the whole session.
   useEffect(() => {
@@ -57,9 +99,18 @@ export function Workout() {
     return () => releaseWakeLock();
   }, []);
 
+  // Tick the total workout timer once a second.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const elapsed = startedAt ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0;
+  const elapsedLabel = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
+
   const logRow = (i: number, rest: number) => {
     setRows((r) => r.map((row, j) => (j === i ? { ...row, done: true } : row)));
-    setRest(rest);
+    updateActiveWorkout({ restEndsAt: Date.now() + rest * 1000 });
   };
 
   const setAcc = (id: string, idx: number, value: string) =>
@@ -95,7 +146,13 @@ export function Workout() {
     navigate('/');
   };
 
+  const cancel = () => {
+    clearActiveWorkout();
+    navigate('/');
+  };
+
   return (
+    <>
     <div className="p-4 space-y-6 pb-24">
       <header className="flex items-center justify-between">
         <div>
@@ -103,54 +160,65 @@ export function Workout() {
             Cycle {program.cycle} · Week {program.week} · {template.label}
           </div>
           <h1 className="text-2xl font-bold">{lift.name}</h1>
+          <div className="mt-1 text-sm font-semibold tabular-nums text-accent">
+            ⏱ {elapsedLabel}
+          </div>
         </div>
-        <button onClick={() => navigate('/')} className="text-slate-400 text-sm">
+        <button onClick={cancel} className="text-slate-400 text-sm">
           Cancel
         </button>
       </header>
 
       <section className="space-y-3">
-        {barSets.map((s, i) => (
-          <div
-            key={i}
-            className={`rounded-xl p-3 ${rows[i].done ? 'bg-surface/50' : 'bg-surface'} ${
-              s.isAmrap ? 'ring-2 ring-accent' : ''
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-xs text-slate-400">{s.label}</div>
-                <div className="text-xl font-bold">
-                  {s.targetWeight}kg × {s.targetReps}
-                  {s.isAmrap && <span className="text-accent"> + (AMRAP)</span>}
+        {barSets.map((s, i) => {
+          const done = rows[i].done;
+          const failed = done && (Number(rows[i].reps) || 0) < s.targetReps;
+          return (
+            <div
+              key={i}
+              className={`rounded-xl p-3 ${
+                failed ? 'bg-danger/20' : done ? 'bg-surface/50' : 'bg-surface'
+              } ${s.isAmrap ? 'ring-2 ring-accent' : ''}`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-slate-400">{s.label}</div>
+                  <div className="text-xl font-bold">
+                    {s.targetWeight}kg × {s.targetReps}
+                    {s.isAmrap && <span className="text-accent"> + (AMRAP)</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={rows[i].reps}
+                    onChange={(e) =>
+                      setRows((r) => r.map((row, j) => (j === i ? { ...row, reps: e.target.value } : row)))
+                    }
+                    className="w-16 rounded bg-base text-center text-xl py-2"
+                    aria-label="reps done"
+                  />
+                  <button
+                    onClick={() => logRow(i, s.rest)}
+                    className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+                      failed
+                        ? 'bg-danger/30 text-danger'
+                        : done
+                          ? 'bg-success/30 text-success'
+                          : 'bg-accent text-black'
+                    }`}
+                  >
+                    {failed ? '✗' : done ? '✓' : 'Log'}
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={rows[i].reps}
-                  onChange={(e) =>
-                    setRows((r) => r.map((row, j) => (j === i ? { ...row, reps: e.target.value } : row)))
-                  }
-                  className="w-16 rounded bg-base text-center text-xl py-2"
-                  aria-label="reps done"
-                />
-                <button
-                  onClick={() => logRow(i, s.rest)}
-                  className={`rounded-lg px-3 py-2 text-sm font-semibold ${
-                    rows[i].done ? 'bg-success/30 text-success' : 'bg-accent text-black'
-                  }`}
-                >
-                  {rows[i].done ? '✓' : 'Log'}
-                </button>
+              <div className="mt-2">
+                <PlateVisual loadout={s.loadout} barWeight={config.inventory.barWeight} />
               </div>
             </div>
-            <div className="mt-2">
-              <PlateVisual loadout={s.loadout} barWeight={config.inventory.barWeight} />
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </section>
 
       <section className="space-y-4">
@@ -179,7 +247,9 @@ export function Workout() {
                   />
                   <button
                     type="button"
-                    onClick={() => setRest(config.rest.accessory)}
+                    onClick={() =>
+                      updateActiveWorkout({ restEndsAt: Date.now() + config.rest.accessory * 1000 })
+                    }
                     className="rounded bg-base py-1 text-sm text-slate-400"
                     aria-label={`rest after ${ex.name} set ${idx + 1}`}
                   >
@@ -198,14 +268,18 @@ export function Workout() {
       >
         Finish workout
       </button>
-
-      {rest !== null && (
-        <RestTimer
-          seconds={rest}
-          onDone={() => {}}
-          onClose={() => setRest(null)}
-        />
-      )}
     </div>
+
+    {/* Rendered outside the space-y-* flow so no injected top margin offsets
+        the full-screen fixed overlay (see issue #11). */}
+    {restEndsAt !== null && (
+      <RestTimer
+        endsAt={restEndsAt}
+        onDone={() => {}}
+        onClose={() => updateActiveWorkout({ restEndsAt: null })}
+        onAdjust={(endsAt) => updateActiveWorkout({ restEndsAt: endsAt })}
+      />
+    )}
+    </>
   );
 }

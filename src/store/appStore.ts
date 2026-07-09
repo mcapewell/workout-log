@@ -44,6 +44,23 @@ export interface SessionRecord {
   accessories: AccessoryLog[];
 }
 
+/** An in-progress workout, persisted so it survives navigation, lock, and app
+ * kill. The sets themselves are regenerated deterministically from program +
+ * config; only the user-entered progress and timers live here. */
+export interface ActiveWorkout {
+  /** ms epoch when the workout started — drives the total workout timer. */
+  startedAt: number;
+  /** Signature guard: which lift/week this progress belongs to. */
+  liftId: MainLiftId;
+  week: number;
+  /** Per bar-set entered reps + done flag, aligned to the generated set order. */
+  rows: { reps: string; done: boolean }[];
+  /** Per accessory-exercise entered reps, keyed by exercise id. */
+  accReps: Record<string, string[]>;
+  /** Absolute end time of an open rest timer, or null when none is running. */
+  restEndsAt: number | null;
+}
+
 export interface ProgramState {
   cycle: number;
   week: number; // 1..4
@@ -78,11 +95,21 @@ interface AppState {
   config: AppConfig;
   program: ProgramState;
   history: SessionRecord[];
+  /** The workout currently in progress, or null when none is running. */
+  activeWorkout: ActiveWorkout | null;
 
   completeSetup: (config: AppConfig) => void;
   updateConfig: (partial: Partial<AppConfig>) => void;
   currentLift: () => MainLift;
   currentAccessoryGroup: () => AccessoryGroup;
+  startWorkout: (init: {
+    liftId: MainLiftId;
+    week: number;
+    rows: { reps: string; done: boolean }[];
+    accReps: Record<string, string[]>;
+  }) => void;
+  updateActiveWorkout: (partial: Partial<ActiveWorkout>) => void;
+  clearActiveWorkout: () => void;
   finishWorkout: (payload: FinishPayload) => SessionRecord;
   importState: (data: Partial<AppState>) => void;
   resetAll: () => void;
@@ -164,8 +191,30 @@ export const useApp = create<AppState>()(
       config: DEFAULT_CONFIG,
       program: INITIAL_PROGRAM,
       history: [],
+      activeWorkout: null,
 
       completeSetup: (config) => set({ config, setupComplete: true }),
+
+      startWorkout: ({ liftId, week, rows, accReps }) =>
+        set({
+          activeWorkout: {
+            startedAt: Date.now(),
+            liftId,
+            week,
+            rows,
+            accReps,
+            restEndsAt: null,
+          },
+        }),
+
+      updateActiveWorkout: (partial) =>
+        set((s) =>
+          s.activeWorkout
+            ? { activeWorkout: { ...s.activeWorkout, ...partial } }
+            : {},
+        ),
+
+      clearActiveWorkout: () => set({ activeWorkout: null }),
 
       updateConfig: (partial) =>
         set((s) => ({ config: { ...s.config, ...partial } })),
@@ -260,6 +309,7 @@ export const useApp = create<AppState>()(
           history: [record, ...state.history],
           config: { ...config, accessoryGroups, mainLifts },
           program: { cycle, week, dayIndex, accessoryIndex, liftCycleAmrap: finalCycleAmrap },
+          activeWorkout: null,
         });
 
         return record;
@@ -271,6 +321,7 @@ export const useApp = create<AppState>()(
           config: data.config ?? s.config,
           program: data.program ?? s.program,
           history: data.history ?? s.history,
+          activeWorkout: data.activeWorkout ?? s.activeWorkout,
         })),
 
       resetAll: () =>
@@ -279,6 +330,7 @@ export const useApp = create<AppState>()(
           config: DEFAULT_CONFIG,
           program: INITIAL_PROGRAM,
           history: [],
+          activeWorkout: null,
         }),
     }),
     {
@@ -289,6 +341,7 @@ export const useApp = create<AppState>()(
         config: s.config,
         program: s.program,
         history: s.history,
+        activeWorkout: s.activeWorkout,
       }),
     },
   ),
