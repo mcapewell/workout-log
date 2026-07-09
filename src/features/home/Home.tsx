@@ -49,7 +49,11 @@ export function Home() {
               Resume →
             </Link>
             <button
-              onClick={clearActiveWorkout}
+              onClick={() => {
+                if (confirm('Discard this workout? Your logged progress will be lost.')) {
+                  clearActiveWorkout();
+                }
+              }}
               className="rounded-lg bg-base px-4 py-3 text-sm text-slate-400"
             >
               Discard
