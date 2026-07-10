@@ -159,6 +159,7 @@ const DEFAULT_ACCESSORY_GROUPS: AccessoryGroup[] = [
       acc('a-curl', 'Bicep Curl', 18.5),
       acc('a-rope-curl', 'Rope Cable Curl', 17.5),
       acc('a-btb-curl', 'Behind-the-Back Curl', 6),
+      acc('a-abs', 'Cable Crunch', 20, 12, 20),
     ],
   },
   {
@@ -170,6 +171,7 @@ const DEFAULT_ACCESSORY_GROUPS: AccessoryGroup[] = [
       acc('b-crossover', 'Single-Arm Cable Crossover', 10, 12, 15),
       acc('b-row', 'Seated Cable Row', 32.5),
       acc('b-lateral', 'Single-Arm Lateral Raise', 6, 12, 20),
+      acc('b-abs', 'Cable Woodchopper', 10, 12, 15),
     ],
   },
 ];
