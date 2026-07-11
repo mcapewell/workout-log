@@ -1,5 +1,8 @@
-// Generates simple solid PNG app icons (no external deps) so the PWA installs
-// cleanly. Draws a dumbbell-ish mark: accent bar on a dark rounded field.
+// Generates PNG app icons (no external deps) so the PWA installs cleanly.
+// Draws a dumbbell mark traced from the app icon design: a central handle
+// flanked by graduated weight bars (tallest inner, then middle, then short end
+// caps) in the accent colour on a dark field. Geometry is shared with
+// public/favicon.svg; 3x supersampling anti-aliases the rounded corners.
 import { deflateSync } from 'node:zlib';
 import { writeFileSync, mkdirSync } from 'node:fs';
 
@@ -27,22 +30,51 @@ const chunk = (type, data) => {
   return Buffer.concat([len, body, crc]);
 };
 
+const BG = [15, 23, 42]; // theme base
+const FG = [56, 189, 248]; // theme accent
+
+// Dumbbell bars as rounded rects [x0, y0, x1, y1, r] in a 512-unit space,
+// matching public/favicon.svg. Normalised to fractions so they scale to any
+// icon size.
+const bars = [
+  [184, 221, 328, 291, 20], // handle
+  [140, 106, 184, 406, 22], // inner plate (left, tallest)
+  [328, 106, 372, 406, 22], // inner plate (right, tallest)
+  [78, 140, 122, 372, 22], // middle plate (left)
+  [390, 140, 434, 372, 22], // middle plate (right)
+  [14, 212, 48, 300, 16], // end cap (left)
+  [464, 212, 498, 300, 16], // end cap (right)
+].map(([x0, y0, x1, y1, r]) => [x0 / 512, y0 / 512, x1 / 512, y1 / 512, r / 512]);
+
+// Is normalised point (x, y) inside a rounded rect?
+function inRoundRect(x, y, [x0, y0, x1, y1, r]) {
+  if (x < x0 || x > x1 || y < y0 || y > y1) return false;
+  const cx = Math.min(Math.max(x, x0 + r), x1 - r);
+  const cy = Math.min(Math.max(y, y0 + r), y1 - r);
+  const dx = x - cx;
+  const dy = y - cy;
+  return dx * dx + dy * dy <= r * r;
+}
+
 function png(size) {
-  const [bgR, bgG, bgB] = [15, 23, 42];
-  const [fgR, fgG, fgB] = [56, 189, 248];
   const raw = Buffer.alloc((size * 3 + 1) * size);
+  const SS = 3; // supersampling per axis for anti-aliased edges
   for (let y = 0; y < size; y++) {
     raw[y * (size * 3 + 1)] = 0; // filter: none
     for (let x = 0; x < size; x++) {
       const i = y * (size * 3 + 1) + 1 + x * 3;
-      // Horizontal bar through the middle third = the "barbell".
-      const inBar = y > size * 0.42 && y < size * 0.58 && x > size * 0.15 && x < size * 0.85;
-      const inPlateL = x > size * 0.15 && x < size * 0.3 && y > size * 0.3 && y < size * 0.7;
-      const inPlateR = x > size * 0.7 && x < size * 0.85 && y > size * 0.3 && y < size * 0.7;
-      const fg = inBar || inPlateL || inPlateR;
-      raw[i] = fg ? fgR : bgR;
-      raw[i + 1] = fg ? fgG : bgG;
-      raw[i + 2] = fg ? fgB : bgB;
+      let hits = 0;
+      for (let sy = 0; sy < SS; sy++) {
+        for (let sx = 0; sx < SS; sx++) {
+          const nx = (x + (sx + 0.5) / SS) / size;
+          const ny = (y + (sy + 0.5) / SS) / size;
+          if (bars.some((b) => inRoundRect(nx, ny, b))) hits++;
+        }
+      }
+      const t = hits / (SS * SS);
+      raw[i] = Math.round(BG[0] + (FG[0] - BG[0]) * t);
+      raw[i + 1] = Math.round(BG[1] + (FG[1] - BG[1]) * t);
+      raw[i + 2] = Math.round(BG[2] + (FG[2] - BG[2]) * t);
     }
   }
   const ihdr = Buffer.alloc(13);
@@ -65,6 +97,6 @@ writeFileSync('public/pwa-512.png', png(512));
 writeFileSync('public/apple-touch-icon.png', png(180));
 writeFileSync(
   'public/favicon.svg',
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#0f172a"/><rect x="15" y="44" width="70" height="12" fill="#38bdf8"/><rect x="15" y="32" width="14" height="36" fill="#38bdf8"/><rect x="71" y="32" width="14" height="36" fill="#38bdf8"/></svg>`,
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" fill="#0f172a"/><rect x="184" y="221" width="144" height="70" rx="20" fill="#38bdf8"/><rect x="140" y="106" width="44" height="300" rx="22" fill="#38bdf8"/><rect x="328" y="106" width="44" height="300" rx="22" fill="#38bdf8"/><rect x="78" y="140" width="44" height="232" rx="22" fill="#38bdf8"/><rect x="390" y="140" width="44" height="232" rx="22" fill="#38bdf8"/><rect x="14" y="212" width="34" height="88" rx="16" fill="#38bdf8"/><rect x="464" y="212" width="34" height="88" rx="16" fill="#38bdf8"/></svg>`,
 );
 console.log('icons written to public/');
