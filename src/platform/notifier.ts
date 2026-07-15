@@ -54,20 +54,43 @@ export function playAlarm(): void {
 // ---- Wake Lock (keep the screen awake during a workout) ---------------------
 
 let wakeLock: WakeLockSentinel | null = null;
+// The browser auto-releases the wake lock whenever the page becomes hidden
+// (switching apps, locking the phone). We track intent so we can re-acquire it
+// on return, otherwise the OS idle timer takes over and the screen sleeps.
+let wantWakeLock = false;
 
-export async function acquireWakeLock(): Promise<void> {
+async function requestWakeLock(): Promise<void> {
   try {
-    if ('wakeLock' in navigator) {
+    if ('wakeLock' in navigator && document.visibilityState === 'visible') {
       wakeLock = await (navigator as Navigator & {
         wakeLock: { request(type: 'screen'): Promise<WakeLockSentinel> };
       }).wakeLock.request('screen');
+      // Keep our reference accurate if the browser drops the lock itself.
+      wakeLock.addEventListener('release', () => {
+        wakeLock = null;
+      });
     }
   } catch {
     // Non-fatal: some browsers reject when not visible/charging.
   }
 }
 
+function handleVisibilityChange(): void {
+  if (wantWakeLock && document.visibilityState === 'visible') {
+    void requestWakeLock();
+  }
+}
+
+export async function acquireWakeLock(): Promise<void> {
+  wantWakeLock = true;
+  // addEventListener de-dupes an identical handler, so re-mounts are safe.
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  await requestWakeLock();
+}
+
 export function releaseWakeLock(): void {
+  wantWakeLock = false;
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
   void wakeLock?.release();
   wakeLock = null;
 }
