@@ -11,6 +11,7 @@ import type {
   MainLift,
   MainLiftId,
   PlateInventory,
+  RestLoad,
 } from '../domain/types';
 
 export interface RestDefaults {
@@ -62,6 +63,8 @@ export interface ActiveWorkout {
   accDone: Record<string, boolean[]>;
   /** Absolute end time of an open rest timer, or null when none is running. */
   restEndsAt: number | null;
+  /** Plate breakdown to show on the open rest timer (what to load next), or null. */
+  restLoad: RestLoad | null;
 }
 
 export interface ProgramState {
@@ -215,6 +218,7 @@ export const useApp = create<AppState>()(
             accReps,
             accDone,
             restEndsAt: null,
+            restLoad: null,
           },
         }),
 

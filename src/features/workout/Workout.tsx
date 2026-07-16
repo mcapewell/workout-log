@@ -6,7 +6,7 @@ import { bestLoadout } from '../../domain/plates';
 import { PlateVisual } from '../../components/PlateVisual';
 import { RestTimer } from '../../components/RestTimer';
 import { acquireWakeLock, releaseWakeLock, unlockAudio } from '../../platform/notifier';
-import type { PrescribedSet } from '../../domain/types';
+import type { PrescribedSet, RestLoad } from '../../domain/types';
 
 interface BarRowState {
   reps: string;
@@ -28,6 +28,7 @@ export function Workout() {
   // the total timer and rest overlay in sync across resume / reload.
   const startedAt = useApp((s) => s.activeWorkout?.startedAt ?? null);
   const restEndsAt = useApp((s) => s.activeWorkout?.restEndsAt ?? null);
+  const restLoad = useApp((s) => s.activeWorkout?.restLoad ?? null);
 
   const template = getWeekTemplate(program.week);
 
@@ -123,7 +124,15 @@ export function Workout() {
 
   const logRow = (i: number, rest: number) => {
     setRows((r) => r.map((row, j) => (j === i ? { ...row, done: true } : row)));
-    updateActiveWorkout({ restEndsAt: Date.now() + rest * 1000 });
+    // Show the next set to load during rest; on the last set fall back to it (#27).
+    const hasNext = i + 1 < barSets.length;
+    const next = hasNext ? barSets[i + 1] : barSets[i];
+    const restLoad: RestLoad = {
+      label: `${hasNext ? 'Up next' : 'This set'} · ${next.targetWeight}kg × ${next.targetReps}`,
+      loadout: next.loadout,
+      barWeight: config.inventory.barWeight,
+    };
+    updateActiveWorkout({ restEndsAt: Date.now() + rest * 1000, restLoad });
   };
 
   const setAcc = (id: string, idx: number, value: string) =>
@@ -139,7 +148,18 @@ export function Workout() {
       ...d,
       [id]: (d[id] ?? []).map((v, j) => (j === idx ? true : v)),
     }));
-    updateActiveWorkout({ restEndsAt: Date.now() + config.rest.accessory * 1000 });
+    // All sets of an accessory share one weight, so "next to load" is this
+    // exercise's load. Cable exercises use a pin stack, so no plate breakdown (#27).
+    const ex = accessoryGroup.exercises.find((e) => e.id === id);
+    const restLoad: RestLoad | null =
+      ex && (ex.equipment ?? 'cable') !== 'cable'
+        ? {
+            label: `${ex.name} · ${ex.weight}kg`,
+            loadout: bestLoadout(ex.weight, { ...config.inventory, barWeight: ex.barWeight ?? 0 }),
+            barWeight: ex.barWeight ?? 0,
+          }
+        : null;
+    updateActiveWorkout({ restEndsAt: Date.now() + config.rest.accessory * 1000, restLoad });
   };
 
   // Last logged reps + weight per accessory exercise, taken from the most recent
@@ -345,8 +365,9 @@ export function Workout() {
     {restEndsAt !== null && (
       <RestTimer
         endsAt={restEndsAt}
+        load={restLoad}
         onDone={() => {}}
-        onClose={() => updateActiveWorkout({ restEndsAt: null })}
+        onClose={() => updateActiveWorkout({ restEndsAt: null, restLoad: null })}
         onAdjust={(endsAt) => updateActiveWorkout({ restEndsAt: endsAt })}
       />
     )}

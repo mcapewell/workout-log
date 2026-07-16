@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { playAlarm } from '../platform/notifier';
+import { PlateVisual } from './PlateVisual';
+import type { RestLoad } from '../domain/types';
 
 interface Props {
   /** Absolute wall-clock end time (ms epoch). Owned by the caller so the
    * countdown can be persisted and resumed across navigation / lock / reload. */
   endsAt: number;
+  /** Plate breakdown to load next, shown under the countdown (#27). Null = none. */
+  load?: RestLoad | null;
   onDone: () => void;
   onClose: () => void;
   /** Report a new end time when the user taps −15s / +15s so the caller can
@@ -21,7 +25,7 @@ const remainingSecs = (endsAt: number) =>
  * When it reaches zero it fires the audible alarm + on-screen flash (the
  * reliable iOS feedback channel).
  */
-export function RestTimer({ endsAt, onDone, onClose, onAdjust }: Props) {
+export function RestTimer({ endsAt, load, onDone, onClose, onAdjust }: Props) {
   const [remaining, setRemaining] = useState(() => remainingSecs(endsAt));
   const [flash, setFlash] = useState(false);
   const fired = useRef(false);
@@ -63,6 +67,14 @@ export function RestTimer({ endsAt, onDone, onClose, onAdjust }: Props) {
       <div className="text-7xl font-bold tabular-nums mb-8">
         {mm}:{ss}
       </div>
+      {load && (
+        <div className="mb-8 w-full max-w-xs rounded-xl bg-surface px-4 py-3">
+          <div className="mb-1.5 text-xs uppercase tracking-wide text-slate-400">
+            {load.label}
+          </div>
+          <PlateVisual loadout={load.loadout} barWeight={load.barWeight} />
+        </div>
+      )}
       <div className="flex gap-3 mb-8">
         <button onClick={() => adjust(-15)} className="px-4 py-3 rounded-lg bg-surface text-lg">
           −15s
