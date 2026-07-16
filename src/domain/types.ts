@@ -39,6 +39,14 @@ export interface Loadout {
   perSide: LoadoutEntry[];
 }
 
+/** What the rest timer should tell the user to load next while they rest. */
+export interface RestLoad {
+  /** Composed heading, e.g. "Up next · 90kg × 5" or "This set · 60kg × 10". */
+  label: string;
+  loadout: Loadout;
+  barWeight: number;
+}
+
 export interface BBBConfig {
   percentOfTM: number;
   sets: number;
