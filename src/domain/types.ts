@@ -41,10 +41,14 @@ export interface Loadout {
 
 /** What the rest timer should tell the user to load next while they rest. */
 export interface RestLoad {
-  /** Composed heading, e.g. "Up next · 90kg × 5" or "This set · 60kg × 10". */
+  /** Composed heading, e.g. "Up next · 90kg × 5" or "Up next · Face Pull · 21kg". */
   label: string;
-  loadout: Loadout;
-  barWeight: number;
+  /** Plate breakdown to load, or null for cable/stack exercises (label only). */
+  loadout?: Loadout | null;
+  barWeight?: number;
+  /** Set when the completed set was the final one in the workout — the timer
+   * shows a "workout complete" message instead of a plate breakdown. */
+  complete?: boolean;
 }
 
 export interface BBBConfig {
