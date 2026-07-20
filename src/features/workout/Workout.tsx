@@ -52,6 +52,31 @@ export function Workout() {
     [mainSets, bbbSets, config.rest],
   );
 
+  // Last logged reps + weight per accessory exercise, taken from the most recent
+  // session that recorded any reps for it. Gives the user a target to aim for (#20)
+  // and seeds the default reps so an unchanged accessory logs its prior value.
+  const prevAccReps = useMemo(() => {
+    const map: Record<string, { reps: number[]; weight: number }> = {};
+    for (const ex of accessoryGroup.exercises) {
+      const last = history.find((s) =>
+        s.accessories.some((a) => a.id === ex.id && a.reps.length > 0),
+      );
+      const logged = last?.accessories.find((a) => a.id === ex.id);
+      if (logged) map[ex.id] = { reps: logged.reps, weight: logged.weight };
+    }
+    return map;
+  }, [history, accessoryGroup]);
+
+  // Fresh accessory reps: default each set to the previous session's reps (the
+  // placeholder value) so leaving it untouched logs that number, mirroring how
+  // main sets pre-fill their target reps. No history for a set means no number
+  // to assume, so it stays blank (the placeholder is just an "S1" label).
+  const freshAccReps = (ex: { id: string; sets: number }) =>
+    Array.from({ length: ex.sets }, (_, idx) => {
+      const prev = prevAccReps[ex.id]?.reps[idx];
+      return prev !== undefined ? String(prev) : '';
+    });
+
   // Seed local state either from a resumable in-progress workout (matching this
   // lift/week) or from fresh defaults. Runs once on mount.
   const initial = useMemo(() => {
@@ -65,7 +90,7 @@ export function Workout() {
       return {
         rows: aw.rows,
         accReps: Object.fromEntries(
-          accessoryGroup.exercises.map((a) => [a.id, aw.accReps[a.id] ?? Array(a.sets).fill('')]),
+          accessoryGroup.exercises.map((a) => [a.id, aw.accReps[a.id] ?? freshAccReps(a)]),
         ),
         accDone: Object.fromEntries(
           accessoryGroup.exercises.map((a) => [a.id, aw.accDone?.[a.id] ?? Array(a.sets).fill(false)]),
@@ -74,7 +99,7 @@ export function Workout() {
     }
     return {
       rows: barSets.map((s) => ({ reps: String(s.targetReps), done: false })),
-      accReps: Object.fromEntries(accessoryGroup.exercises.map((a) => [a.id, Array(a.sets).fill('')])),
+      accReps: Object.fromEntries(accessoryGroup.exercises.map((a) => [a.id, freshAccReps(a)])),
       accDone: Object.fromEntries(accessoryGroup.exercises.map((a) => [a.id, Array(a.sets).fill(false)])),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -161,20 +186,6 @@ export function Workout() {
         : null;
     updateActiveWorkout({ restEndsAt: Date.now() + config.rest.accessory * 1000, restLoad });
   };
-
-  // Last logged reps + weight per accessory exercise, taken from the most recent
-  // session that recorded any reps for it. Gives the user a target to aim for (#20).
-  const prevAccReps = useMemo(() => {
-    const map: Record<string, { reps: number[]; weight: number }> = {};
-    for (const ex of accessoryGroup.exercises) {
-      const last = history.find((s) =>
-        s.accessories.some((a) => a.id === ex.id && a.reps.length > 0),
-      );
-      const logged = last?.accessories.find((a) => a.id === ex.id);
-      if (logged) map[ex.id] = { reps: logged.reps, weight: logged.weight };
-    }
-    return map;
-  }, [history, accessoryGroup]);
 
   const finish = () => {
     const amrapIndex = barSets.findIndex((s) => s.isAmrap);
