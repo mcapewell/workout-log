@@ -69,10 +69,20 @@ export function RestTimer({ endsAt, load, onDone, onClose, onAdjust }: Props) {
       </div>
       {load && (
         <div className="mb-8 w-full max-w-xs rounded-xl bg-surface px-4 py-3">
-          <div className="mb-1.5 text-xs uppercase tracking-wide text-slate-400">
-            {load.label}
-          </div>
-          <PlateVisual loadout={load.loadout} barWeight={load.barWeight} />
+          {load.complete ? (
+            <div className="py-1 text-center text-lg font-semibold">🎉 Workout complete</div>
+          ) : (
+            <>
+              <div className="mb-1.5 text-xs uppercase tracking-wide text-slate-400">
+                {load.label}
+              </div>
+              {load.loadout ? (
+                <PlateVisual loadout={load.loadout} barWeight={load.barWeight ?? 0} />
+              ) : (
+                <div className="text-sm text-slate-400">Cable / stack — no plates</div>
+              )}
+            </>
+          )}
         </div>
       )}
       <div className="flex gap-3 mb-8">

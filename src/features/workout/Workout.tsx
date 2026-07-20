@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useApp, type AccessoryLog } from '../../store/appStore';
 import { generateMainSets, generateBBB, getWeekTemplate } from '../../domain/fiveThreeOne';
 import { bestLoadout } from '../../domain/plates';
+import { buildRestFlow } from '../../domain/restFlow';
 import { PlateVisual } from '../../components/PlateVisual';
 import { RestTimer } from '../../components/RestTimer';
 import { acquireWakeLock, releaseWakeLock, unlockAudio } from '../../platform/notifier';
-import type { PrescribedSet, RestLoad } from '../../domain/types';
+import type { PrescribedSet } from '../../domain/types';
 
 interface BarRowState {
   reps: string;
@@ -50,6 +51,14 @@ export function Workout() {
       ...bbbSets.map((s) => ({ ...s, rest: config.rest.bbb })),
     ],
     [mainSets, bbbSets, config.rest],
+  );
+
+  // One ordered view of every set (bar then accessories) so the rest timer can
+  // always surface the *next* set to load, crossing the bar→accessory and
+  // exercise boundaries, and flag the final set as workout-complete (#29).
+  const restFlow = useMemo(
+    () => buildRestFlow(barSets, accessoryGroup.exercises, config.inventory),
+    [barSets, accessoryGroup, config.inventory],
   );
 
   // Last logged reps + weight per accessory exercise, taken from the most recent
@@ -149,15 +158,12 @@ export function Workout() {
 
   const logRow = (i: number, rest: number) => {
     setRows((r) => r.map((row, j) => (j === i ? { ...row, done: true } : row)));
-    // Show the next set to load during rest; on the last set fall back to it (#27).
-    const hasNext = i + 1 < barSets.length;
-    const next = hasNext ? barSets[i + 1] : barSets[i];
-    const restLoad: RestLoad = {
-      label: `${hasNext ? 'Up next' : 'This set'} · ${next.targetWeight}kg × ${next.targetReps}`,
-      loadout: next.loadout,
-      barWeight: config.inventory.barWeight,
-    };
-    updateActiveWorkout({ restEndsAt: Date.now() + rest * 1000, restLoad });
+    // Show the next set to load during rest — this crosses into the accessories
+    // after the last bar set, or reports workout-complete on the final set (#29).
+    updateActiveWorkout({
+      restEndsAt: Date.now() + rest * 1000,
+      restLoad: restFlow.restAfter[i],
+    });
   };
 
   const setAcc = (id: string, idx: number, value: string) =>
@@ -173,18 +179,12 @@ export function Workout() {
       ...d,
       [id]: (d[id] ?? []).map((v, j) => (j === idx ? true : v)),
     }));
-    // All sets of an accessory share one weight, so "next to load" is this
-    // exercise's load. Cable exercises use a pin stack, so no plate breakdown (#27).
-    const ex = accessoryGroup.exercises.find((e) => e.id === id);
-    const restLoad: RestLoad | null =
-      ex && (ex.equipment ?? 'cable') !== 'cable'
-        ? {
-            label: `${ex.name} · ${ex.weight}kg`,
-            loadout: bestLoadout(ex.weight, { ...config.inventory, barWeight: ex.barWeight ?? 0 }),
-            barWeight: ex.barWeight ?? 0,
-          }
-        : null;
-    updateActiveWorkout({ restEndsAt: Date.now() + config.rest.accessory * 1000, restLoad });
+    // Show the next set to load: the following set of this exercise, the first
+    // set of the next exercise, or workout-complete on the final set (#29).
+    updateActiveWorkout({
+      restEndsAt: Date.now() + config.rest.accessory * 1000,
+      restLoad: restFlow.restAfter[restFlow.accOffset[id] + idx],
+    });
   };
 
   const finish = () => {
