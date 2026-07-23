@@ -21,6 +21,23 @@ describe('5/3/1 cycle progression', () => {
     expect(r.newTrainingMax).toBe(82.5);
   });
 
+  it('honours a configured (smaller) increment on a lower lift', () => {
+    const squat: MainLift = {
+      id: 'squat',
+      name: 'Squat',
+      category: 'lower',
+      trainingMax: 130,
+      increment: 2.5, // user lowered it from the +5 lower default
+    };
+    const r = evaluateCycle(squat, [
+      { week: 1, reps: 8 },
+      { week: 2, reps: 5 },
+      { week: 3, reps: 3 },
+    ]);
+    expect(r.action).toBe('increase');
+    expect(r.newTrainingMax).toBe(132.5);
+  });
+
   it('resets to ~90% when a minimum is missed', () => {
     const r = evaluateCycle(bench, [
       { week: 1, reps: 5 },
