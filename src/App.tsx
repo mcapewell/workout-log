@@ -3,6 +3,7 @@ import { useHydrated } from './hooks/useHydrated';
 import { useApp } from './store/appStore';
 import { Home } from './features/home/Home';
 import { Workout } from './features/workout/Workout';
+import { CycleReview } from './features/cycle-review/CycleReview';
 import { Setup } from './features/setup/Setup';
 import { History } from './features/history/History';
 import { Stats } from './features/stats/Stats';
@@ -60,6 +61,7 @@ export default function App() {
       <main className="flex-1 overflow-y-auto">
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/cycle-review" element={<CycleReview />} />
           <Route path="/workout" element={<Workout />} />
           <Route path="/history" element={<History />} />
           <Route path="/stats" element={<Stats />} />

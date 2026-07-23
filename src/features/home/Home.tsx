@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useApp } from '../../store/appStore';
 import { getWeekTemplate } from '../../domain/fiveThreeOne';
 
@@ -10,6 +10,7 @@ export function Home() {
   const accessoryGroup = useApp((s) => s.currentAccessoryGroup)();
   const activeWorkout = useApp((s) => s.activeWorkout);
   const clearActiveWorkout = useApp((s) => s.clearActiveWorkout);
+  const pendingCycleReview = useApp((s) => s.pendingCycleReview);
   const template = getWeekTemplate(program.week);
 
   // Live-tick the elapsed time shown on the resume banner.
@@ -24,6 +25,12 @@ export function Home() {
     config.mainLifts.find((l) => l.id === activeWorkout?.liftId)?.name ?? currentLift.name;
   const elapsed = activeWorkout ? Math.max(0, Math.floor((now - activeWorkout.startedAt) / 1000)) : 0;
   const elapsedLabel = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
+
+  // A finished cycle leaves proposed Training Maxes to approve; send the user to
+  // the review before they start the next cycle (unless a workout is resuming).
+  if (pendingCycleReview && !activeWorkout) {
+    return <Navigate to="/cycle-review" replace />;
+  }
 
   return (
     <div className="p-4 space-y-5">

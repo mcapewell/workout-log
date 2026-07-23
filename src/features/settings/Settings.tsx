@@ -16,6 +16,11 @@ export function Settings() {
       mainLifts: config.mainLifts.map((l) => (l.id === id ? { ...l, trainingMax: tm } : l)),
     });
 
+  const setIncrement = (id: string, increment: number) =>
+    updateConfig({
+      mainLifts: config.mainLifts.map((l) => (l.id === id ? { ...l, increment } : l)),
+    });
+
   const setRest = (key: 'warmup' | 'main' | 'bbb' | 'accessory', v: number) =>
     updateConfig({ rest: { ...config.rest, [key]: v } });
 
@@ -71,18 +76,40 @@ export function Settings() {
 
       <section className="space-y-2">
         <h2 className="font-semibold text-slate-300">Training Maxes</h2>
+        <p className="text-xs text-slate-500">
+          Per-cycle bump is applied only after you approve it at cycle end. Lower
+          it (e.g. to 2.5 kg for squat/deadlift) if the jumps feel too big.
+        </p>
         {config.mainLifts.map((l) => (
-          <div key={l.id} className="flex items-center justify-between rounded-lg bg-surface p-3">
-            <span>{l.name}</span>
-            <div className="flex items-center gap-1">
-              <input
-                type="number"
-                inputMode="decimal"
-                value={l.trainingMax}
-                onChange={(e) => setTM(l.id, Number(e.target.value))}
-                className="w-24 rounded bg-base text-right px-2 py-1"
-              />
-              <span className="text-slate-400 text-sm">kg</span>
+          <div key={l.id} className="rounded-lg bg-surface p-3">
+            <div className="flex items-center justify-between">
+              <span>{l.name}</span>
+              <label className="flex items-center gap-1 text-sm text-slate-400">
+                TM
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={l.trainingMax}
+                  onChange={(e) => setTM(l.id, Number(e.target.value))}
+                  className="w-20 rounded bg-base text-right px-2 py-1 text-slate-100"
+                  aria-label={`${l.name} training max`}
+                />
+                kg
+              </label>
+            </div>
+            <div className="mt-2 flex items-center justify-end">
+              <label className="flex items-center gap-1 text-sm text-slate-400">
+                +/cycle
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={l.increment}
+                  onChange={(e) => setIncrement(l.id, Number(e.target.value))}
+                  className="w-20 rounded bg-base text-right px-2 py-1 text-slate-100"
+                  aria-label={`${l.name} per-cycle increment`}
+                />
+                kg
+              </label>
             </div>
           </div>
         ))}

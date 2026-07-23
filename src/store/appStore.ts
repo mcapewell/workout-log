@@ -3,11 +3,12 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { dexieStorage } from '../platform/storage';
 import { DEFAULT_INVENTORY } from '../domain/plates';
 import { estimate1RM } from '../domain/fiveThreeOne';
-import { evaluateCycle, progressAccessory } from '../domain/progression';
+import { evaluateCycle, progressAccessory, type MainAction } from '../domain/progression';
 import type {
   AccessoryEquipment,
   AccessoryGroup,
   BBBConfig,
+  LiftCategory,
   MainLift,
   MainLiftId,
   PlateInventory,
@@ -88,6 +89,26 @@ export interface AppConfig {
   includeWarmups: boolean;
 }
 
+/** One lift's proposed Training Max change, awaiting the user's approval at the
+ * end of a cycle. */
+export interface CycleReviewLift {
+  liftId: MainLiftId;
+  name: string;
+  category: LiftCategory;
+  currentTrainingMax: number;
+  proposedTrainingMax: number;
+  action: MainAction;
+  reason: string;
+}
+
+/** The set of proposed Training Max changes for a just-completed cycle. The new
+ * TMs are not applied until the user approves them on the review screen. */
+export interface CycleReview {
+  /** The cycle number that just finished. */
+  cycle: number;
+  lifts: CycleReviewLift[];
+}
+
 interface FinishPayload {
   amrapReps?: number;
   amrapWeight?: number;
@@ -103,6 +124,8 @@ interface AppState {
   history: SessionRecord[];
   /** The workout currently in progress, or null when none is running. */
   activeWorkout: ActiveWorkout | null;
+  /** Proposed Training Max changes awaiting approval after a cycle, or null. */
+  pendingCycleReview: CycleReview | null;
 
   completeSetup: (config: AppConfig) => void;
   updateConfig: (partial: Partial<AppConfig>) => void;
@@ -118,8 +141,24 @@ interface AppState {
   updateActiveWorkout: (partial: Partial<ActiveWorkout>) => void;
   clearActiveWorkout: () => void;
   finishWorkout: (payload: FinishPayload) => SessionRecord;
+  /** Commit the (possibly edited) Training Maxes from the cycle review. */
+  applyCycleReview: (decisions: { liftId: MainLiftId; trainingMax: number }[]) => void;
   importState: (data: Partial<AppState>) => void;
   resetAll: () => void;
+}
+
+/** Fill in any fields older persisted/imported configs may be missing without
+ * touching values that are already set. Currently backfills each main lift's
+ * per-cycle `increment` from its category (lower +5 / upper +2.5). */
+function normalizeConfig(config: AppConfig): AppConfig {
+  return {
+    ...config,
+    mainLifts: config.mainLifts.map((l) =>
+      typeof l.increment === 'number'
+        ? l
+        : { ...l, increment: l.category === 'lower' ? 5 : 2.5 },
+    ),
+  };
 }
 
 const DEFAULT_LIFTS: MainLift[] = [
@@ -205,6 +244,7 @@ export const useApp = create<AppState>()(
       program: INITIAL_PROGRAM,
       history: [],
       activeWorkout: null,
+      pendingCycleReview: null,
 
       completeSetup: (config) => set({ config, setupComplete: true }),
 
@@ -297,20 +337,35 @@ export const useApp = create<AppState>()(
 
         // 3) Advance the schedule; roll the cycle over after the deload week.
         let { cycle, week, dayIndex } = program;
-        let mainLifts = config.mainLifts;
         let finalCycleAmrap = liftCycleAmrap;
+        // At cycle end we stage the proposed Training Maxes for the user to
+        // review rather than applying them immediately; they're committed by
+        // applyCycleReview once approved.
+        let pendingCycleReview = state.pendingCycleReview;
 
         dayIndex += 1;
         if (dayIndex >= config.dayOrder.length) {
           dayIndex = 0;
           week += 1;
           if (week > 4) {
-            // Cycle complete: progress or reset each lift's Training Max.
-            mainLifts = config.mainLifts.map((l) => {
-              const reps = liftCycleAmrap[l.id] ?? [];
-              const result = evaluateCycle(l, reps);
-              return { ...l, trainingMax: result.newTrainingMax };
-            });
+            // Cycle complete: compute each lift's proposed Training Max change
+            // and stage it for approval (TMs stay put until the user applies).
+            pendingCycleReview = {
+              cycle: program.cycle,
+              lifts: config.mainLifts.map((l) => {
+                const reps = liftCycleAmrap[l.id] ?? [];
+                const result = evaluateCycle(l, reps);
+                return {
+                  liftId: l.id,
+                  name: l.name,
+                  category: l.category,
+                  currentTrainingMax: l.trainingMax,
+                  proposedTrainingMax: result.newTrainingMax,
+                  action: result.action,
+                  reason: result.reason,
+                };
+              }),
+            };
             week = 1;
             cycle += 1;
             finalCycleAmrap = {};
@@ -322,21 +377,37 @@ export const useApp = create<AppState>()(
 
         set({
           history: [record, ...state.history],
-          config: { ...config, accessoryGroups, mainLifts },
+          config: { ...config, accessoryGroups },
           program: { cycle, week, dayIndex, accessoryIndex, liftCycleAmrap: finalCycleAmrap },
           activeWorkout: null,
+          pendingCycleReview,
         });
 
         return record;
       },
 
+      applyCycleReview: (decisions) =>
+        set((s) => {
+          const byId = new Map(decisions.map((d) => [d.liftId, d.trainingMax]));
+          return {
+            config: {
+              ...s.config,
+              mainLifts: s.config.mainLifts.map((l) =>
+                byId.has(l.id) ? { ...l, trainingMax: byId.get(l.id)! } : l,
+              ),
+            },
+            pendingCycleReview: null,
+          };
+        }),
+
       importState: (data) =>
         set((s) => ({
           setupComplete: data.setupComplete ?? s.setupComplete,
-          config: data.config ?? s.config,
+          config: data.config ? normalizeConfig(data.config) : s.config,
           program: data.program ?? s.program,
           history: data.history ?? s.history,
           activeWorkout: data.activeWorkout ?? s.activeWorkout,
+          pendingCycleReview: data.pendingCycleReview ?? null,
         })),
 
       resetAll: () =>
@@ -346,17 +417,30 @@ export const useApp = create<AppState>()(
           program: INITIAL_PROGRAM,
           history: [],
           activeWorkout: null,
+          pendingCycleReview: null,
         }),
     }),
     {
       name: 'workout-log-state',
       storage: createJSONStorage(() => dexieStorage),
+      version: 1,
+      // Upgrade data saved before the per-lift increment / cycle-review fields
+      // existed. Non-destructive: only backfills what's missing.
+      migrate: (persisted) => {
+        const s = (persisted ?? {}) as Partial<AppState>;
+        return {
+          ...s,
+          config: s.config ? normalizeConfig(s.config) : DEFAULT_CONFIG,
+          pendingCycleReview: s.pendingCycleReview ?? null,
+        } as AppState;
+      },
       partialize: (s) => ({
         setupComplete: s.setupComplete,
         config: s.config,
         program: s.program,
         history: s.history,
         activeWorkout: s.activeWorkout,
+        pendingCycleReview: s.pendingCycleReview,
       }),
     },
   ),
