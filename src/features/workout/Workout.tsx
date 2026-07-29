@@ -188,6 +188,7 @@ export function Workout() {
   };
 
   const finish = () => {
+    if (!confirm('Finish this workout?')) return;
     const amrapIndex = barSets.findIndex((s) => s.isAmrap);
     const amrapReps =
       amrapIndex >= 0 ? Number(rows[amrapIndex]?.reps) || 0 : undefined;
