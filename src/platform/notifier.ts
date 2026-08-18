@@ -28,9 +28,20 @@ export function vibrate(pattern: number | number[]): void {
 }
 
 /** A short chime made of three rising beeps — audible in a noisy gym. */
-export function playAlarm(): void {
+export async function playAlarm(): Promise<void> {
   unlockAudio();
   if (!audioCtx) return;
+  // iOS / installed PWAs suspend the AudioContext while backgrounded and it does
+  // not reliably return to `running` on its own. If we schedule oscillators
+  // against a still-suspended clock the beeps are silently lost, so wait for the
+  // resume to take effect before reading currentTime.
+  if (audioCtx.state === 'suspended') {
+    try {
+      await audioCtx.resume();
+    } catch {
+      // Nothing more we can do without a user gesture; fall through and try anyway.
+    }
+  }
   const now = audioCtx.currentTime;
   const freqs = [660, 880, 1180];
   freqs.forEach((f, i) => {
@@ -76,9 +87,11 @@ async function requestWakeLock(): Promise<void> {
 }
 
 function handleVisibilityChange(): void {
-  if (wantWakeLock && document.visibilityState === 'visible') {
-    void requestWakeLock();
-  }
+  if (document.visibilityState !== 'visible') return;
+  // The OS suspends the AudioContext while we're backgrounded; resume it as soon
+  // as we return so the rest-timer alarm is ready to fire (see playAlarm).
+  if (audioCtx?.state === 'suspended') void audioCtx.resume();
+  if (wantWakeLock) void requestWakeLock();
 }
 
 export async function acquireWakeLock(): Promise<void> {

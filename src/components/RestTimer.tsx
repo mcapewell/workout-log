@@ -42,7 +42,7 @@ export function RestTimer({ endsAt, load, onDone, onClose, onAdjust }: Props) {
       setRemaining(left);
       if (left <= 0 && !fired.current) {
         fired.current = true;
-        playAlarm();
+        void playAlarm();
         setFlash(true);
         setTimeout(() => setFlash(false), 3000);
         onDone();
